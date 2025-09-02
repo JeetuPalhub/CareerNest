@@ -76,7 +76,7 @@ export const login = async (req, res) => {
         const tokenData = {
             userId: user._id,
         };
-        const token = await jwt.sign(tokenData, process.env.SECRET_KEY, { expiresIn: "1d" });
+        const token = await jwt.sign(tokenData, process.env.SECRET_KEY, { expiresIn: '1d' });
 
         user = {
             _id: user._id,
@@ -92,7 +92,7 @@ export const login = async (req, res) => {
             .cookie("token", token, {
                 maxAge: 1 * 24 * 60 * 60 * 1000,
                 httpOnly: true,
-                sameSite: "strict",
+                sameSite: 'strict'
             })
             .json({
                 message: `Welcome back ${user.fullname}`,
@@ -109,7 +109,7 @@ export const logout = async (req, res) => {
         return res
             .status(200)
             .cookie("token", "", {
-                maxAge: 0,
+                maxAge: 0
             })
             .json({
                 message: "Logged out successfully.",

@@ -1,4 +1,4 @@
-import { Application } from "express";
+import { Application } from "../models/application.model.js"
 import { Job } from "../models/job.model.js";
 
 
@@ -13,8 +13,9 @@ export const applyJob = async (req, res) => {
                 success: false
             })
         };
+
         //check if the user has already applied for the job
-        const existingApplication = await application.findOne({ job: jobId, applicant: userId });
+        const existingApplication = await Application.findOne({ job: jobId, applicant: userId });
 
         if(existingApplication) {
             return res.status(400).json({
@@ -31,14 +32,16 @@ export const applyJob = async (req, res) => {
                 success: false
             })
         }
+
         // create a new application 
-        const newApplication = await application.create({
+        const newApplication = await Application.create({
             job: jobId,
             application: userId,
         });
 
         job.applications.push(newApplication._id);
         await job.save();
+
         return res.status(201).json({
             message: "Job applied successfully.",
             success: true
@@ -108,7 +111,7 @@ export const updateStatus = async (req, res) => {
             })
         };
 
-        // find the applicationby applicantion id
+        // find the application by applicantion id
         const applicantion = await Application.findOne({_id:applicationId});
         if(!applicantion) {
             return res.status(404).json({

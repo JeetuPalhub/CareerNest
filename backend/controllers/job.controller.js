@@ -39,7 +39,7 @@ export const getAllJobs = async (req, res) => {
         const keyword = req.query.keyword || "";
         const query = {
             $or: [
-                {title: {regex: keyword, $options: "i"}},
+                { title: { $regex: keyword, $options: "i" } },
                 {description: {$regex: keyword, $options: "i"}},
             ]
         };
@@ -63,8 +63,8 @@ export const getAllJobs = async (req, res) => {
      // student 
 export const getJobById = async (req, res) => {
     try {
-        const jobId = req.param.id;
-        const job = await Job.findbyId(jobId);
+        const jobId = req.params.id;
+        const job = await Job.findById(jobId);
         if(!job) {
             return res.status(404).json({
                 message: "Jobs not found.",

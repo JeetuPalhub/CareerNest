@@ -175,3 +175,29 @@ export const updateProfile = async (req, res) => {
         console.log(error);
     }
 };
+
+
+export const getProfile = async (req, res) => {
+    try {
+        const userId = req.id; // comes from isAuthenticated middleware
+        const user = await User.findById(userId).select("-password"); // exclude password
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false,
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            user,
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: "Server error",
+            success: false,
+        });
+    }
+};

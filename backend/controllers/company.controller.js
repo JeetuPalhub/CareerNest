@@ -28,17 +28,19 @@ export const registerCompany = async (req, res) => {
             success: true
         })
     } catch (error) {
-        console.log(error);
+        console.error(error);
+        return res.status(500).json({ success: false, message: "Server error" });
     }
 } 
 export const getCompany = async (req, res) => {
     try {
         const userId = req.id; //logged in user id
         const companies = await Company.find({ userId });
-        if(!companies) {
-            return res.status(404).json({
-                message: "companies not found.",
-                success: false
+        if(!companies || companies.length === 0) {
+            return res.status(200).json({
+                companies: [],
+                success: true,
+                message: "No companies found"
             })
         }
         return res.status(200).json({
@@ -46,7 +48,8 @@ export const getCompany = async (req, res) => {
             success: true
         })
     } catch (error) {
-        console.log(error);
+        console.error(error);
+        return res.status(500).json({ success: false, message: "Server error" });
     }
 }
     //get company by id
@@ -65,7 +68,8 @@ export const getCompany = async (req, res) => {
                 success: true
             })
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            return res.status(500).json({ success: false, message: "Server error" });
         }
     }
 export const updateCompany = async (req, res) => {
@@ -73,9 +77,14 @@ export const updateCompany = async (req, res) => {
         const { name, description, website, location } = req.body;
        
         const file = req.file;
-        //idhar cloudinary ayega
+        // if your middleware attaches an uploaded file, pick its url/path
+        const updateData = { name, description, website, location };
+        if (file) {
+            updateData.logo = file.path || file.filename || "";
+        }
 
-        const updateData = { name, description, website, location, logo };
+        // remove undefined keys
+        Object.keys(updateData).forEach((k) => updateData[k] === undefined && delete updateData[k]);
 
         const company = await Company.findByIdAndUpdate(req.params.id, updateData, { new: true });
 
@@ -87,9 +96,11 @@ export const updateCompany = async (req, res) => {
         }
         return res.status(200).json({
             message: "company information updated.",
+            company,
             success: true
         })
     } catch (error) {
-        console.log(error);
+        console.error(error);
+        return res.status(500).json({ success: false, message: "Server error" });
     }
 }

@@ -36,7 +36,11 @@ export const register = async (req, res) => {
             success: true
         });
     } catch (error) {
-        console.log(error);
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
     }
 };
 
@@ -100,7 +104,11 @@ export const login = async (req, res) => {
                 success: true
             })
     } catch (error) {
-        console.log(error);
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
     }
 };
 
@@ -116,7 +124,11 @@ export const logout = async (req, res) => {
                 success: true,
             })
     } catch (error) {
-        console.log(error);
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
     }
 }
 
@@ -172,7 +184,11 @@ export const updateProfile = async (req, res) => {
             success: true,
         });
     } catch (error) {
-        console.log(error);
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
     }
 };
 
@@ -194,7 +210,7 @@ export const getProfile = async (req, res) => {
             user,
         });
     } catch (error) {
-        console.log(error);
+        console.error(error);
         return res.status(500).json({
             message: "Server error",
             success: false,

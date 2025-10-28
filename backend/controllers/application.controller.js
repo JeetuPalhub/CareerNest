@@ -46,9 +46,13 @@ export const applyJob = async (req, res) => {
             message: "Job applied successfully.",
             success: true
         })
-    } catch (error) {
-        console.log(error);
-    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
 };
 export const getAppliedJobs = async (req, res) => {
   try {

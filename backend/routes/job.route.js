@@ -1,13 +1,36 @@
 import express from "express";
 import isAuthenticated from "../middlewares/isAuthenticated.js";
-import { getJobById, postJob, getAdminJobs, getAllJobs } from "../controllers/job.controller.js";
+import { authorizeRoles } from "../middlewares/authorizeRoles.js";
+
+import {
+  createJob,
+  getJobById,
+  getRecruiterJobs,
+  getAllJobs,
+} from "../controllers/job.controller.js";
 
 const router = express.Router();
 
-//Jobs
-router.route("/post").post(isAuthenticated, postJob);
-router.route("/get").get(getAllJobs); // public route
-router.route("/getadminjobs").get(isAuthenticated, getAdminJobs);
-router.route("/get/:id").get(getJobById);
+// Recruiter/Admin: Create job
+router.post(
+  "/",
+  isAuthenticated,
+  authorizeRoles("recruiter", "admin"),
+  createJob
+);
+
+// Public: Get all jobs (with filters + pagination)
+router.get("/", getAllJobs);
+
+// Public: Get job details
+router.get("/:id", getJobById);
+
+// Recruiter/Admin: Get jobs posted by the logged-in recruiter
+router.get(
+  "/admin/jobs",
+  isAuthenticated,
+  authorizeRoles("recruiter", "admin"),
+  getRecruiterJobs
+);
 
 export default router;

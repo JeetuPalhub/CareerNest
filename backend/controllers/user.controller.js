@@ -1,219 +1,131 @@
 import { User } from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
+import ApiResponse from "../utils/ApiResponse.js";
 
-export const register = async (req, res) => {
-    try {
-        const { fullname, email, phoneNumber, password, role } = req.body;
-
-        if (!fullname || !email || !phoneNumber || !password || !role) {
-            return res.status(400).json({
-                message: "Something is missing",
-                success: false
-            });
-        };
-
-
-        const user = await User.findOne({ email });
-        if (user) {
-            return res.status(400).json({
-                message: "User already exists with this email.",
-                success: false,
-            });
-        }
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        await User.create({
-            fullname,
-            email,
-            phoneNumber,
-            password: hashedPassword,
-            role,
-        });
-
-        return res.status(201).json({
-            message: "Account created successfully.",
-            success: true
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
-    }
+// Generate JWT Token
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, process.env.SECRET_KEY, { expiresIn: "1d" });
 };
 
-export const login = async (req, res) => {
-    try {
-        const { email, password, role } = req.body;
+// ---------------------------
+// Register
+// ---------------------------
+export const register = asyncHandler(async (req, res) => {
+  const { fullname, email, phoneNumber, password, role } = req.body;
 
-        if (!email || !password || !role) {
-            return res.status(400).json({
-                message: "Something is missing",
-                success: false
-            });
-        };
-        let user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({
-                message: "Incorrect email or password.",
-                success: false,
-            });
-        }
-        const isPasswordMatch = await bcrypt.compare(password, user.password);
-        if (!isPasswordMatch) {
-            return res.status(400).json({
-                message: "Incorrect email or password.",
-                success: false,
-            });
-        };
+  if (!fullname || !email || !phoneNumber || !password || !role) {
+    throw new ApiError(400, "All fields are required");
+  }
 
-        // check role is correct or not
-        if (role !== user.role) {
-            return res.status(400).json({
-                message: "Account doesn't exist with current role.",
-                success: false,
-            });
-        }
+  const existing = await User.findOne({ email });
+  if (existing) {
+    throw new ApiError(400, "User already exists with this email");
+  }
 
-        const tokenData = {
-            userId: user._id,
-        };
-        const token = await jwt.sign(tokenData, process.env.SECRET_KEY, { expiresIn: '1d' });
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-        user = {
-            _id: user._id,
-            fullname: user.fullname,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            role: user.role,
-            profile: user.profile,
-        };
+  await User.create({
+    fullname,
+    email,
+    phoneNumber,
+    password: hashedPassword,
+    role,
+  });
 
-        return res
-            .status(200)
-            .cookie("token", token, {
-                maxAge: 1 * 24 * 60 * 60 * 1000,
-                httpOnly: true,
-                sameSite: 'strict'
-            })
-            .json({
-                message: `Welcome back ${user.fullname}`,
-                user,
-                success: true
-            })
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
-    }
-};
+  return res
+    .status(201)
+    .json(new ApiResponse(201, "Account created successfully"));
+});
 
-export const logout = async (req, res) => {
-    try {
-        return res
-            .status(200)
-            .cookie("token", "", {
-                maxAge: 0
-            })
-            .json({
-                message: "Logged out successfully.",
-                success: true,
-            })
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
-    }
-}
+// ---------------------------
+// Login
+// ---------------------------
+export const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
 
-export const updateProfile = async (req, res) => {
-    try {
-        const { fullname, email, phoneNumber, bio, skills } = req.body;
-       
-        const file = req.file;
+  if (!email || !password) {
+    throw new ApiError(400, "Email and password are required");
+  }
 
+  let user = await User.findOne({ email }).select("+password");
+  if (!user) {
+    throw new ApiError(400, "Incorrect email or password");
+  }
 
-      
-        
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) {
+    throw new ApiError(400, "Incorrect email or password");
+  }
 
-        let skillsArray;
-        if (skills) {
-            skillsArray = skills.split(",");
-        }
+  const token = generateToken(user._id);
 
-        const userId = req.id; //  middleware authentication
-        let user = await User.findById(userId);
+  user = user.toObject();
+  delete user.password;
 
-        if (!user) {
-            return res.status(400).json({
-                message: "User not found.",
-                success: false,
-            });
-        }
+  return res
+    .status(200)
+    .cookie("token", token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    })
+    .json(
+      new ApiResponse(200, `Welcome back ${user.fullname}`, {
+        user,
+        token,
+      })
+    );
+});
 
-        // updating data
-        if (fullname) user.fullname = fullname
-        if (email) user.email = email
-        if (phoneNumber) user.phoneNumber = phoneNumber
-        if (bio) user.profile.bio = bio
-        if (skills) user.profile.skills = skillsArray
+// ---------------------------
+// Logout
+// ---------------------------
+export const logout = asyncHandler(async (req, res) => {
+  res.cookie("token", "", { maxAge: 0 });
 
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Logged out successfully"));
+});
 
-        // resume comes later here...
+// ---------------------------
+// Get Profile
+// ---------------------------
+export const getProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.id).select("-password");
 
-        await user.save();
+  if (!user) throw new ApiError(404, "User not found");
 
-        user = {
-            _id: user._id,
-            fullname: user.fullname,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            role: user.role,
-            profile: user.profile,
-        };
+  return res.status(200).json(new ApiResponse(200, "User fetched", user));
+});
 
-        return res.status(200).json({
-            message: "Profile updated successfully.",
-            user,
-            success: true,
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
-    }
-};
+// ---------------------------
+// Update Profile
+// ---------------------------
+export const updateProfile = asyncHandler(async (req, res) => {
+  const { fullname, phoneNumber, bio, skills } = req.body;
+  const file = req.file;
 
+  const user = await User.findById(req.id);
+  if (!user) throw new ApiError(404, "User not found");
 
-export const getProfile = async (req, res) => {
-    try {
-        const userId = req.id; // comes from isAuthenticated middleware
-        const user = await User.findById(userId).select("-password"); // exclude password
+  if (fullname) user.fullname = fullname;
+  if (phoneNumber) user.phoneNumber = phoneNumber;
+  if (bio) user.profile.bio = bio;
 
-        if (!user) {
-            return res.status(404).json({
-                message: "User not found",
-                success: false,
-            });
-        }
+  if (skills) {
+    user.profile.skills = skills.split(",").map((s) => s.trim());
+  }
 
-        return res.status(200).json({
-            success: true,
-            user,
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            message: "Server error",
-            success: false,
-        });
-    }
-};
+  // TODO: resume upload logic coming later
+
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Profile updated successfully", user));
+});

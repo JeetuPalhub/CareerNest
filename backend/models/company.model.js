@@ -1,27 +1,64 @@
 import mongoose from "mongoose";
+import slugify from "slugify";
 
-const companySchema = new mongoose.Schema({
+const companySchema = new mongoose.Schema(
+  {
     name: {
-        type: String,
-        required: true,
-        unique: true
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
     },
+
     description: {
-        type: String,
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 10,
     },
+
     website: {
-        type: String
+      type: String,
+      default: "",
+      trim: true,
     },
+
     location: {
-        type: String
+      type: String,
+      default: "",
+      trim: true,
     },
+
     logo: {
-        type: String //URL to company logo
+      type: String,
+      default: "",
     },
+
     userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref:'User',
-        required: true
-    }
-},{timestamps: true})
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
+    slug: {
+      type: String,
+      unique: false,
+    },
+  },
+  { timestamps: true }
+);
+
+// Generate slug on create/update
+companySchema.pre("save", function (next) {
+  if (this.name) {
+    this.slug = slugify(this.name, { lower: true });
+  }
+  next();
+});
+
+// Indexes for faster queries
+companySchema.index({ name: "text", description: "text" });
+companySchema.index({ slug: 1 });
+
 export const Company = mongoose.model("Company", companySchema);

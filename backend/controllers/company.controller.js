@@ -1,106 +1,94 @@
 import { Company } from "../models/company.model.js";
+import ApiError from "../utils/ApiError.js";
+import ApiResponse from "../utils/ApiResponse.js";
+import asyncHandler from "../utils/asyncHandler.js";
 
-export const registerCompany = async (req, res) => {
-    try {
-        const { companyName } = req.body;
-        if(!companyName){
-            return res.status(400).json({
-                message: "Company name is required.",
-                success: false
-            });
-        }
-        let company = await Company.findOne({ name: companyName });
-        if(company){
-            return res.status(400).json({
-                message: "You can't register same company.",
-                success: false
-            })
-        };
-        company = await Company.create({
-            name: companyName,
-            userId: req.id
-        });
+// ------------------------------------
+// CREATE COMPANY (recruiter, admin)
+// ------------------------------------
+export const createCompany = asyncHandler(async (req, res) => {
+  const { name, description, website, location } = req.body;
 
+  if (!name || !description) {
+    throw new ApiError(400, "Company name and description are required");
+  }
 
-        return res.status(201).json({
-            message: "Company registered successfully.",
-            company,
-            success: true
-        })
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-} 
-export const getCompany = async (req, res) => {
-    try {
-        const userId = req.id; //logged in user id
-        const companies = await Company.find({ userId });
-        if(!companies || companies.length === 0) {
-            return res.status(200).json({
-                companies: [],
-                success: true,
-                message: "No companies found"
-            })
-        }
-        return res.status(200).json({
-            companies,
-            success: true
-        })
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-}
-    //get company by id
-    export const getCompanyById = async (req, res) => {
-        try {
-            const companyId = req.params.id;
-            const company = await Company.findById(companyId);
-            if(!company){
-                return res.status(404).json({
-                    message: "Company not found.",
-                    success: false
-                })
-            }
-            return res.status(200).json({
-                company,
-                success: true
-            })
-        } catch (error) {
-            console.error(error);
-            return res.status(500).json({ success: false, message: "Server error" });
-        }
-    }
-export const updateCompany = async (req, res) => {
-    try {
-        const { name, description, website, location } = req.body;
-       
-        const file = req.file;
-        // if your middleware attaches an uploaded file, pick its url/path
-        const updateData = { name, description, website, location };
-        if (file) {
-            updateData.logo = file.path || file.filename || "";
-        }
+  // Recruiter can create ONLY ONE company
+  const existing = await Company.findOne({ userId: req.user._id });
+  if (existing) {
+    throw new ApiError(400, "You already have a registered company");
+  }
 
-        // remove undefined keys
-        Object.keys(updateData).forEach((k) => updateData[k] === undefined && delete updateData[k]);
+  const company = await Company.create({
+    name,
+    description,
+    website: website || "",
+    location: location || "",
+    logo: req.file ? req.file.path : "",
+    userId: req.user._id,
+  });
 
-        const company = await Company.findByIdAndUpdate(req.params.id, updateData, { new: true });
+  return res
+    .status(201)
+    .json(new ApiResponse(201, "Company created successfully", company));
+});
 
-        if(!company) {
-            return res.status(404).json({
-                message: "company not found.",
-                success: false
-            })
-        }
-        return res.status(200).json({
-            message: "company information updated.",
-            company,
-            success: true
-        })
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-}
+// ------------------------------------
+// GET ALL COMPANIES (admin, recruiter)
+// ------------------------------------
+export const getCompanies = asyncHandler(async (req, res) => {
+  const companies = await Company.find({ userId: req.user._id });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Companies fetched", companies));
+});
+
+// ------------------------------------
+// GET COMPANY BY ID (any authenticated user)
+// ------------------------------------
+export const getCompanyById = asyncHandler(async (req, res) => {
+  const company = await Company.findById(req.params.id);
+
+  if (!company) {
+    throw new ApiError(404, "Company not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Company fetched", company));
+});
+
+// ------------------------------------
+// UPDATE COMPANY (owner recruiter or admin)
+// ------------------------------------
+export const updateCompany = asyncHandler(async (req, res) => {
+  const { name, description, website, location } = req.body;
+
+  // Find company
+  const company = await Company.findById(req.params.id);
+  if (!company) throw new ApiError(404, "Company not found");
+
+  // Only owner OR admin can update
+  if (
+    req.user.role !== "admin" &&
+    company.userId.toString() !== req.user._id.toString()
+  ) {
+    throw new ApiError(403, "You are not allowed to edit this company");
+  }
+
+  // Apply updates
+  if (name) company.name = name;
+  if (description) company.description = description;
+  if (website) company.website = website;
+  if (location) company.location = location;
+
+  // Logo update
+  if (req.file) company.logo = req.file.path;
+
+  await company.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Company updated successfully", company));
+});

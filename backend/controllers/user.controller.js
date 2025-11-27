@@ -7,17 +7,27 @@ import ApiResponse from "../utils/ApiResponse.js";
 
 // Generate JWT Token
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.SECRET_KEY, { expiresIn: "1d" });
+  return jwt.sign({ id: userId }, process.env.SECRET_KEY, {
+    expiresIn: "1d",
+  });
 };
 
 // ---------------------------
 // Register
 // ---------------------------
 export const register = asyncHandler(async (req, res) => {
-  const { fullname, email, phoneNumber, password, role } = req.body;
+  let { fullname, email, phoneNumber, password, role } = req.body;
 
   if (!fullname || !email || !phoneNumber || !password || !role) {
     throw new ApiError(400, "All fields are required");
+  }
+
+  // FIX: ensure role is lowercase
+  role = role.toLowerCase();
+
+  // FIX: accept only valid roles
+  if (!["student", "recruiter", "admin"].includes(role)) {
+    throw new ApiError(400, "Invalid role");
   }
 
   const existing = await User.findOne({ email });
@@ -69,14 +79,14 @@ export const login = asyncHandler(async (req, res) => {
     .status(200)
     .cookie("token", token, {
       httpOnly: true,
-      secure: false,
+      secure: false, // true only on HTTPS
       sameSite: "lax",
+      path: "/",     // FIX for localhost cookie
       maxAge: 24 * 60 * 60 * 1000,
     })
     .json(
       new ApiResponse(200, `Welcome back ${user.fullname}`, {
         user,
-        token,
       })
     );
 });
@@ -85,22 +95,26 @@ export const login = asyncHandler(async (req, res) => {
 // Logout
 // ---------------------------
 export const logout = asyncHandler(async (req, res) => {
-  res.cookie("token", "", { maxAge: 0 });
+  res.cookie("token", "", {
+    httpOnly: true,
+    expires: new Date(0),
+    path: "/",
+  });
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, "Logged out successfully"));
+  return res.status(200).json(new ApiResponse(200, "Logged out successfully"));
 });
 
 // ---------------------------
 // Get Profile
 // ---------------------------
 export const getProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.id).select("-password");
+  const user = await User.findById(req.user._id).select("-password");
 
   if (!user) throw new ApiError(404, "User not found");
 
-  return res.status(200).json(new ApiResponse(200, "User fetched", user));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "User fetched", user));
 });
 
 // ---------------------------
@@ -108,9 +122,8 @@ export const getProfile = asyncHandler(async (req, res) => {
 // ---------------------------
 export const updateProfile = asyncHandler(async (req, res) => {
   const { fullname, phoneNumber, bio, skills } = req.body;
-  const file = req.file;
 
-  const user = await User.findById(req.id);
+  const user = await User.findById(req.user._id);
   if (!user) throw new ApiError(404, "User not found");
 
   if (fullname) user.fullname = fullname;
@@ -120,8 +133,6 @@ export const updateProfile = asyncHandler(async (req, res) => {
   if (skills) {
     user.profile.skills = skills.split(",").map((s) => s.trim());
   }
-
-  // TODO: resume upload logic coming later
 
   await user.save();
 

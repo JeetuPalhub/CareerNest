@@ -4,9 +4,9 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
-// ---------------------------------------
-// CREATE JOB (recruiter/admin)
-// ---------------------------------------
+// -------------------------------------------
+// CREATE JOB (recruiter / admin only)
+// -------------------------------------------
 export const createJob = asyncHandler(async (req, res) => {
   const {
     title,
@@ -20,43 +20,45 @@ export const createJob = asyncHandler(async (req, res) => {
     companyId,
   } = req.body;
 
-  // basic validation
-  if (
-    !title ||
-    !description ||
-    !requirements ||
-    !salary ||
-    !experience ||
-    !location ||
-    !jobType ||
-    !position ||
-    !companyId
-  ) {
-    throw new ApiError(400, "All fields are required");
+  // Required fields check
+  const requiredFields = {
+    title,
+    description,
+    requirements,
+    salary,
+    experience,
+    location,
+    jobType,
+    position,
+    companyId,
+  };
+
+  for (const key in requiredFields) {
+    if (!requiredFields[key] || requiredFields[key].trim() === "") {
+      throw new ApiError(400, `${key} is required`);
+    }
   }
 
   // Company must exist
   const company = await Company.findById(companyId);
   if (!company) throw new ApiError(404, "Company not found");
 
-  // Ownership check -> recruiter can only post for their own company
-  if (
-    req.user.role !== "admin" &&
-    company.userId.toString() !== req.user._id.toString()
-  ) {
-    throw new ApiError(403, "You are not the owner of this company");
+  // Only admin or company owner can post jobs
+  const isOwner = company.userId.toString() === req.user._id.toString();
+  if (req.user.role !== "admin" && !isOwner) {
+    throw new ApiError(403, "You are not authorized to post jobs for this company");
   }
 
-  // Create job
+  // Creating job
   const job = await Job.create({
     title,
     description,
     requirements: requirements.split(",").map((r) => r.trim()),
     salary: Number(salary),
+    experienceLevel: Number(experience),
     location,
     jobType,
-    experienceLevel: experience,
-    position,
+    position: Number(position),
     company: companyId,
     created_by: req.user._id,
   });
@@ -66,10 +68,10 @@ export const createJob = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, "Job created successfully", job));
 });
 
-// ---------------------------------------
-// GET ALL JOBS (public)
+// -------------------------------------------
+// GET ALL JOBS (PUBLIC)
 // With filters + pagination
-// ---------------------------------------
+// -------------------------------------------
 export const getAllJobs = asyncHandler(async (req, res) => {
   const {
     keyword = "",
@@ -91,7 +93,7 @@ export const getAllJobs = asyncHandler(async (req, res) => {
 
   if (location) query.location = location;
   if (jobType) query.jobType = jobType;
-  if (experience) query.experienceLevel = experience;
+  if (experience) query.experienceLevel = Number(experience);
 
   if (minSalary || maxSalary) {
     query.salary = {};
@@ -99,35 +101,48 @@ export const getAllJobs = asyncHandler(async (req, res) => {
     if (maxSalary) query.salary.$lte = Number(maxSalary);
   }
 
+  const skip = (Number(page) - 1) * Number(limit);
+
   const jobs = await Job.find(query)
     .populate("company")
     .sort({ createdAt: -1 })
-    .limit(Number(limit))
-    .skip((Number(page) - 1) * Number(limit));
+    .skip(skip)
+    .limit(Number(limit));
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, "Jobs fetched successfully", jobs));
+  const total = await Job.countDocuments(query);
+
+  return res.status(200).json(
+    new ApiResponse(200, "Jobs fetched successfully", {
+      jobs,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / limit),
+    })
+  );
 });
 
-// ---------------------------------------
-// GET JOB BY ID (public)
-// ---------------------------------------
+// -------------------------------------------
+// GET JOB BY ID (PUBLIC)
+// -------------------------------------------
 export const getJobById = asyncHandler(async (req, res) => {
   const job = await Job.findById(req.params.id).populate("company");
 
   if (!job) throw new ApiError(404, "Job not found");
 
-  return res.status(200).json(new ApiResponse(200, "Job fetched", job));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Job fetched successfully", job));
 });
 
-// ---------------------------------------
+// -------------------------------------------
 // GET JOBS POSTED BY LOGGED-IN RECRUITER
-// ---------------------------------------
+// -------------------------------------------
 export const getRecruiterJobs = asyncHandler(async (req, res) => {
-  const jobs = await Job.find({ created_by: req.user._id }).populate("company");
+  const jobs = await Job.find({ created_by: req.user._id })
+    .populate("company")
+    .sort({ createdAt: -1 });
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Recruiter jobs fetched", jobs));
+    .json(new ApiResponse(200, "Recruiter jobs fetched successfully", jobs));
 });

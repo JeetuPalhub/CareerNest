@@ -1,11 +1,12 @@
- import { Application } from "../models/application.model.js";
+import { Application } from "../models/application.model.js";
 import { Job } from "../models/job.model.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 
+
 // -------------------------------------------
-// APPLY FOR A JOB (students only)
+// APPLY FOR A JOB (Students ONLY)
 // -------------------------------------------
 export const applyJob = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -13,16 +14,20 @@ export const applyJob = asyncHandler(async (req, res) => {
 
   if (!jobId) throw new ApiError(400, "Job ID is required");
 
-  const job = await Job.findById(jobId).populate("company");
-
+  const job = await Job.findById(jobId);
   if (!job) throw new ApiError(404, "Job not found");
 
-  // prevent recruiter from applying to their own job
+  // Prevent applying to your own job
   if (job.created_by.toString() === userId.toString()) {
     throw new ApiError(400, "You cannot apply to your own job");
   }
 
-  // Check if already applied
+  // Students only
+  if (req.user.role !== "student") {
+    throw new ApiError(403, "Only students can apply to jobs");
+  }
+
+  // Check existing application
   const existing = await Application.findOne({
     job: jobId,
     applicant: userId,
@@ -32,7 +37,7 @@ export const applyJob = asyncHandler(async (req, res) => {
     throw new ApiError(400, "You have already applied to this job");
   }
 
-  // Create application
+  // Create new application
   const application = await Application.create({
     job: jobId,
     applicant: userId,
@@ -47,8 +52,9 @@ export const applyJob = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, "Application submitted successfully", application));
 });
 
+
 // -------------------------------------------
-// GET ALL JOBS APPLIED BY STUDENT
+// GET JOBS APPLIED BY CURRENT STUDENT
 // -------------------------------------------
 export const getAppliedJobs = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -62,25 +68,25 @@ export const getAppliedJobs = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Applied jobs fetched", applications));
+    .json(new ApiResponse(200, "Applied jobs fetched successfully", applications));
 });
 
+
 // -------------------------------------------
-// GET APPLICANTS FOR A JOB (Recruiter/Admin only)
+// GET APPLICANTS FOR A JOB (Recruiter/Admin)
 // -------------------------------------------
 export const getApplicants = asyncHandler(async (req, res) => {
   const { jobId } = req.params;
 
   const job = await Job.findById(jobId);
-
   if (!job) throw new ApiError(404, "Job not found");
 
-  // Ownership check: recruiter can only view applicants of their own job
+  // Only admin or the recruiter who posted the job
   if (
     req.user.role !== "admin" &&
     job.created_by.toString() !== req.user._id.toString()
   ) {
-    throw new ApiError(403, "You are not allowed to access applicants");
+    throw new ApiError(403, "You are not authorized to view applicants");
   }
 
   const applicants = await Application.find({ job: jobId })
@@ -93,6 +99,7 @@ export const getApplicants = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Applicants fetched successfully", applicants));
 });
 
+
 // -------------------------------------------
 // UPDATE APPLICATION STATUS (Recruiter/Admin)
 // -------------------------------------------
@@ -103,15 +110,19 @@ export const updateStatus = asyncHandler(async (req, res) => {
   if (!status) throw new ApiError(400, "Status is required");
 
   const validStatuses = ["pending", "accepted", "rejected"];
-  if (!validStatuses.includes(status.toLowerCase())) {
-    throw new ApiError(400, "Invalid status value");
+  const normalized = status.toLowerCase();
+
+  if (!validStatuses.includes(normalized)) {
+    throw new ApiError(
+      400,
+      "Invalid status. Allowed: pending, accepted, rejected"
+    );
   }
 
   const application = await Application.findById(id).populate("job");
-
   if (!application) throw new ApiError(404, "Application not found");
 
-  // Ownership check
+  // Only owner recruiter or admin
   if (
     req.user.role !== "admin" &&
     application.job.created_by.toString() !== req.user._id.toString()
@@ -119,10 +130,10 @@ export const updateStatus = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not allowed to update this status");
   }
 
-  application.status = status.toLowerCase();
+  application.status = normalized;
   await application.save();
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Status updated successfully", application));
+    .json(new ApiResponse(200, "Application status updated", application));
 });

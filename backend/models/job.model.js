@@ -28,10 +28,11 @@ const jobSchema = new mongoose.Schema(
       min: 1,
     },
 
+    // FIXED: Experience should be a number, based on your controller
     experienceLevel: {
-      type: String,
+      type: Number,
       required: true,
-      enum: ["fresher", "junior", "mid", "senior", "lead"],
+      min: 0,
     },
 
     location: {
@@ -40,10 +41,11 @@ const jobSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // FIXED: job types should match your frontend values
     jobType: {
       type: String,
       required: true,
-      enum: ["full-time", "part-time", "internship", "remote", "contract"],
+      enum: ["Full-time", "Part-time", "Internship", "Remote", "Contract"],
     },
 
     position: {
@@ -82,15 +84,19 @@ const jobSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Create slug from title
+// --------------------------------------
+// 🔥 Improved slug generator
+// --------------------------------------
 jobSchema.pre("save", function (next) {
-  if (this.title) {
-    this.slug = slugify(this.title, { lower: true });
+  if (this.isModified("title")) {
+    this.slug = slugify(this.title, { lower: true, strict: true });
   }
   next();
 });
 
-// Text index for search
+// --------------------------------------
+// 🔥 Text index for powerful search
+// --------------------------------------
 jobSchema.index({
   title: "text",
   description: "text",

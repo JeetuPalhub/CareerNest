@@ -13,9 +13,9 @@ export const createCompany = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Company name and description are required");
   }
 
-  // Recruiter can create ONLY ONE company
-  const existing = await Company.findOne({ userId: req.user._id });
-  if (existing) {
+  // Recruiter can create only 1 company
+  const existingCompany = await Company.findOne({ userId: req.user._id });
+  if (existingCompany) {
     throw new ApiError(400, "You already have a registered company");
   }
 
@@ -37,15 +37,18 @@ export const createCompany = asyncHandler(async (req, res) => {
 // GET ALL COMPANIES (admin, recruiter)
 // ------------------------------------
 export const getCompanies = asyncHandler(async (req, res) => {
-  const companies = await Company.find({ userId: req.user._id });
+  const companies =
+    req.user.role === "admin"
+      ? await Company.find() // admin sees all companies
+      : await Company.find({ userId: req.user._id }); // recruiter sees only own companies
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Companies fetched", companies));
+    .json(new ApiResponse(200, "Companies fetched successfully", companies));
 });
 
 // ------------------------------------
-// GET COMPANY BY ID (any authenticated user)
+// GET SINGLE COMPANY (any authenticated user)
 // ------------------------------------
 export const getCompanyById = asyncHandler(async (req, res) => {
   const company = await Company.findById(req.params.id);
@@ -56,34 +59,33 @@ export const getCompanyById = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Company fetched", company));
+    .json(new ApiResponse(200, "Company fetched successfully", company));
 });
 
 // ------------------------------------
-// UPDATE COMPANY (owner recruiter or admin)
+// UPDATE COMPANY (owner recruiter OR admin)
 // ------------------------------------
 export const updateCompany = asyncHandler(async (req, res) => {
   const { name, description, website, location } = req.body;
 
-  // Find company
   const company = await Company.findById(req.params.id);
   if (!company) throw new ApiError(404, "Company not found");
 
-  // Only owner OR admin can update
+  // Authorization: only admin OR company owner
   if (
     req.user.role !== "admin" &&
     company.userId.toString() !== req.user._id.toString()
   ) {
-    throw new ApiError(403, "You are not allowed to edit this company");
+    throw new ApiError(403, "You are not authorized to update this company");
   }
 
-  // Apply updates
+  // Update fields
   if (name) company.name = name;
   if (description) company.description = description;
   if (website) company.website = website;
   if (location) company.location = location;
 
-  // Logo update
+  // Update logo if uploaded
   if (req.file) company.logo = req.file.path;
 
   await company.save();

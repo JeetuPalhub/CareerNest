@@ -11,7 +11,11 @@ import {
 
 const router = express.Router();
 
-// Student: Apply for a job
+// -------------------------------
+// STUDENT ROUTES
+// -------------------------------
+
+// Apply for a job
 router.post(
   "/jobs/:jobId/apply",
   isAuthenticated,
@@ -19,7 +23,7 @@ router.post(
   applyJob
 );
 
-// Student: Get all jobs the student applied for
+// Get all jobs applied by the student
 router.get(
   "/applications",
   isAuthenticated,
@@ -27,7 +31,11 @@ router.get(
   getAppliedJobs
 );
 
-// Recruiter/Admin: Get applicants for a job
+// -------------------------------
+// RECRUITER / ADMIN ROUTES
+// -------------------------------
+
+// Get applicants of a specific job
 router.get(
   "/jobs/:jobId/applicants",
   isAuthenticated,
@@ -35,7 +43,7 @@ router.get(
   getApplicants
 );
 
-// Recruiter/Admin: Update application status
+// Update status of an application
 router.patch(
   "/applications/:id/status",
   isAuthenticated,

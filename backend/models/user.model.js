@@ -6,41 +6,41 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      minlength: 3,
+      minlength: [3, "Full name must be at least 3 characters"],
     },
 
     email: {
       type: String,
-      required: true,
+      required: [true, "Email is required"],
       unique: true,
       lowercase: true,
       trim: true,
     },
 
     phoneNumber: {
-      type: String, // IMPORTANT: use string, not number
-      required: true,
+      type: String, // keep as string for leading zeros + country codes
+      required: [true, "Phone number is required"],
       trim: true,
     },
 
     password: {
       type: String,
-      required: true,
-      select: false, // Do not fetch by default
+      required: [true, "Password is required"],
+      select: false, // prevent leaking password
     },
 
     role: {
       type: String,
-      required: true,
-      enum: ["student", "recruiter", "admin"], // Updated roles
+      enum: ["student", "recruiter", "admin"],
       default: "student",
+      required: true,
     },
 
     profile: {
       bio: {
         type: String,
-        default: "",
         trim: true,
+        default: "",
       },
 
       skills: {
@@ -49,9 +49,9 @@ const userSchema = new mongoose.Schema(
       },
 
       resume: {
-        type: String,
+        type: String, // file path or URL
         default: "",
-      }, // Stored path or URL
+      },
 
       resumeOriginalName: {
         type: String,
@@ -75,7 +75,7 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Create index for faster login searches
-userSchema.index({ email: 1 });
+// 🛠 FIX DUPLICATE INDEX WARNING (MongoDB throws warning without this)
+userSchema.index({ email: 1 }, { unique: true });
 
 export const User = mongoose.model("User", userSchema);

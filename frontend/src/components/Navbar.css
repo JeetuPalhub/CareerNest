@@ -1,0 +1,43 @@
+/* Navbar Container */
+.navbar {
+  width: 100%;
+  background: #161b22;
+  padding: 18px 50px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #e6edf3;
+  border-bottom: 1px solid #262c36;
+}
+
+/* Left Logo */
+.navbar h2 {
+  color: #3b82f6;
+  margin: 0;
+  font-size: 26px;
+}
+
+/* Right Menu */
+.nav-links a {
+  margin-left: 25px;
+  font-size: 17px;
+  color: #e6edf3;
+  text-decoration: none;
+}
+
+.nav-links a:hover {
+  color: #3b82f6;
+}
+
+/* Login Button */
+.login-btn {
+  background: #3b82f6;
+  padding: 10px 20px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: white !important;
+}
+
+.login-btn:hover {
+  background: #2563eb;
+}

@@ -1,27 +1,20 @@
+import React from "react";
+import "./Navbar.css";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 
-export default function Navbar() {
-  const { user, logout } = useAuth();
-
+const Navbar = () => {
   return (
-    <nav style={{ padding: "15px", background: "#222", color: "white" }}>
-      <Link to="/" style={{ marginRight: "15px" }}>Home</Link>
-      <Link to="/jobs" style={{ marginRight: "15px" }}>Jobs</Link>
+    <div className="navbar">
+      <h2>CareerNest</h2>
 
-      {!user && (
-        <>
-          <Link to="/login" style={{ marginRight: "15px" }}>Login</Link>
-          <Link to="/register">Register</Link>
-        </>
-      )}
-
-      {user && (
-        <>
-          <span style={{ marginRight: "15px" }}>Hi, {user.fullname}</span>
-          <button onClick={logout}>Logout</button>
-        </>
-      )}
-    </nav>
+      <div className="nav-links">
+        <Link to="/">Home</Link>
+        <Link to="/jobs">Jobs</Link>
+        <Link to="/profile">Profile</Link>
+        <Link to="/login" className="login-btn">Login</Link>
+      </div>
+    </div>
   );
-}
+};
+
+export default Navbar;
